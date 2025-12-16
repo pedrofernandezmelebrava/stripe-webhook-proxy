@@ -10,7 +10,6 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 const appsScriptUrl = process.env.APPS_SCRIPT_URL; // https://script.google.com/macros/s/.../exec
-const proxySecret = process.env.PROXY_SECRET;       // secreto tuyo compartido con Apps Script
 
 app.get("/", (req, res) => res.status(200).send("ok"));
 
@@ -26,7 +25,7 @@ app.post("/webhook", async (req, res) => {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // 2) Reenviar a Apps Script con secreto propio
+  // 2) Reenviar a Apps Script con url
   try {
     if (!appsScriptUrl) {
       console.error("❌ Missing APPS_SCRIPT_URL");
@@ -37,12 +36,12 @@ app.post("/webhook", async (req, res) => {
       return res.status(500).send("missing_proxy_secret");
     }
 
-    const forwardRes = await fetch(appsScriptUrl, {
+    const forwardUrl = new URL(appsScriptUrl);
+    forwardUrl.searchParams.set("proxy_secret", proxySecret);
+    
+    const forwardRes = await fetch(forwardUrl.toString(), {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Proxy-Secret": proxySecret
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(event),
       redirect: "follow"
     });
