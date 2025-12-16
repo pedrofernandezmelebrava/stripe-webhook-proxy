@@ -10,6 +10,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 const appsScriptUrl = process.env.APPS_SCRIPT_URL; // https://script.google.com/macros/s/.../exec
+const proxySecret = process.env.PROXY_SECRET;       // secreto tuyo (mismo que en Apps Script)
 
 app.get("/", (req, res) => res.status(200).send("ok"));
 
@@ -25,7 +26,7 @@ app.post("/webhook", async (req, res) => {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // 2) Reenviar a Apps Script con url
+  // 2) Reenviar a Apps Script con proxy_secret por querystring
   try {
     if (!appsScriptUrl) {
       console.error("❌ Missing APPS_SCRIPT_URL");
@@ -38,7 +39,7 @@ app.post("/webhook", async (req, res) => {
 
     const forwardUrl = new URL(appsScriptUrl);
     forwardUrl.searchParams.set("proxy_secret", proxySecret);
-    
+
     const forwardRes = await fetch(forwardUrl.toString(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -47,7 +48,7 @@ app.post("/webhook", async (req, res) => {
     });
 
     const text = await forwardRes.text();
-    console.log("➡️ Forwarded to Apps Script:", forwardRes.status, text.slice(0, 200));
+    console.log("➡️ Forwarded to Apps Script:", forwardRes.status, text.slice(0, 300));
 
     if (forwardRes.ok) return res.status(200).send("ok");
 
@@ -56,7 +57,6 @@ app.post("/webhook", async (req, res) => {
     console.error("❌ Forward error:", err);
     return res.status(500).send("forward_error");
   }
-
 });
 
 const port = process.env.PORT || 3000;
