@@ -28,6 +28,15 @@ app.post("/webhook", async (req, res) => {
 
   // 2) Reenviar a Apps Script con secreto propio
   try {
+    if (!appsScriptUrl) {
+      console.error("❌ Missing APPS_SCRIPT_URL");
+      return res.status(500).send("missing_apps_script_url");
+    }
+    if (!proxySecret) {
+      console.error("❌ Missing PROXY_SECRET");
+      return res.status(500).send("missing_proxy_secret");
+    }
+
     const forwardRes = await fetch(appsScriptUrl, {
       method: "POST",
       headers: {
@@ -39,14 +48,16 @@ app.post("/webhook", async (req, res) => {
     });
 
     const text = await forwardRes.text();
+    console.log("➡️ Forwarded to Apps Script:", forwardRes.status, text.slice(0, 200));
+
     if (forwardRes.ok) return res.status(200).send("ok");
 
-    console.error("❌ Apps Script responded:", forwardRes.status, text);
     return res.status(500).send("forward_failed");
   } catch (err) {
     console.error("❌ Forward error:", err);
     return res.status(500).send("forward_error");
   }
+
 });
 
 const port = process.env.PORT || 3000;
