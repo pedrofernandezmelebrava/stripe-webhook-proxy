@@ -1,6 +1,5 @@
 import express from "express";
 import Stripe from "stripe";
-import fetch from "node-fetch";
 
 const app = express();
 
@@ -13,25 +12,16 @@ app.post(
   express.raw({ type: "application/json" }),
   async (req, res) => {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-      // Recomendado: fija la API version para evitar sorpresas con cambios de Stripe
       apiVersion: process.env.STRIPE_API_VERSION || "2023-10-16",
     });
 
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    const appsScriptUrl = process.env.APPS_SCRIPT_URL; // https://script.google.com/macros/s/.../exec
+    const appsScriptUrl = process.env.APPS_SCRIPT_URL;
     const proxySecret = process.env.PROXY_SECRET;
 
-    if (!endpointSecret) {
-      console.error("❌ Missing STRIPE_WEBHOOK_SECRET");
-      return res.status(500).send("missing_stripe_webhook_secret");
-    }
-    if (!appsScriptUrl) {
-      console.error("❌ Missing APPS_SCRIPT_URL");
-      return res.status(500).send("missing_apps_script_url");
-    }
-    if (!proxySecret) {
-      console.error("❌ Missing PROXY_SECRET");
-      return res.status(500).send("missing_proxy_secret");
+    if (!endpointSecret || !appsScriptUrl || !proxySecret) {
+      console.error("❌ Missing env vars");
+      return res.status(500).send("missing_env_vars");
     }
 
     // 1) Verify Stripe signature
@@ -42,11 +32,10 @@ app.post(
 
       event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
     } catch (err) {
-      console.error("❌ Signature verification failed:", err?.message || err);
-      return res.status(400).send(`Webhook Error: ${err?.message || String(err)}`);
+      console.error("❌ Signature verification failed:", err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // Minimal logging (event already verified)
     console.log(
       "✅ Event:",
       event.type,
@@ -56,7 +45,7 @@ app.post(
       event.livemode
     );
 
-    // 2) Forward to Apps Script with proxy_secret in query string
+    // 2) Forward to Apps Script
     try {
       const forwardUrl = new URL(appsScriptUrl);
       forwardUrl.searchParams.set("proxy_secret", proxySecret);
@@ -68,7 +57,6 @@ app.post(
           "User-Agent": "railway-stripe-proxy/1.0",
         },
         body: JSON.stringify(event),
-        redirect: "follow",
       });
 
       const text = await forwardRes.text();
@@ -90,3 +78,4 @@ app.post(
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Listening on :${port}`));
+
